@@ -7,11 +7,26 @@ from api.schemas.job_schema import JobSchema  # Adjust the import based on your 
 job_api = Blueprint('job_api', __name__)
 
 @job_api.route('/jobs', methods=['GET'])
-def get_jobs():
-    jobs = Job.query.all()
-    job_schema = JobSchema(many=True)
-    job_list = job_schema.dump(jobs)
-    return jsonify({'jobs': job_list})
+def get_filtered_jobs():
+    company_id = int(request.args.get('companyId', 0))
+    keyword = request.args.get('keyword', '').strip()
+    location = request.args.get('location', 'all' if request.args.get('location') is None else '').strip()
+    salary = request.args.get('salary', '0').strip()
+
+    filtered_query = Job.query
+
+    if keyword or location != 'all' or salary != '0' or company_id > 0:
+        filtered_query = filtered_query.filter(
+            or_(Job.title.ilike(f"%{keyword}%") if keyword else "",
+                Job.location == location if location != 'all' else "",
+                Job.company_id == company_id if company_id > 0 else "",
+                and_(Job.salary >= 10000000, Job.salary <= 25000000) if salary else ""
+            )
+        )
+
+    jobs = filtered_query.all()
+
+    return jsonify({'jobs': jobs})
 
 @job_api.route('/jobs/<int:job_id>', methods=['GET'])
 def get_job(job_id):

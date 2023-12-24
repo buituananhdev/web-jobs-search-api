@@ -18,7 +18,7 @@ Sample API layout structure to be used as a baseline for other apps
     ```
 3. Start the server with:
     ```
-   pipenv run python -m flask run
+    pipenv run python -m flask run
     ```
    
 4. Visit http://localhost/api for the home api
