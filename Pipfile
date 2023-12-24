@@ -9,7 +9,9 @@ flasgger = "*"
 flask-marshmallow = "*"
 apispec = "*"
 python-dotenv = "*"
-
+flask_sqlalchemy = "*"
+flask-jwt-extended = "*"
+flask_jwt_extended = "*"
 [dev-packages]
 
 [requires]

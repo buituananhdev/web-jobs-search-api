@@ -1,0 +1,117 @@
+from flask import Blueprint, request, jsonify
+from http import HTTPStatus
+from api.models.database import db
+from api.models.job import Job
+from api.schemas.job_schema import JobSchema  # Adjust the import based on your project structure
+
+job_api = Blueprint('job_api', __name__)
+
+@job_api.route('/jobs', methods=['GET'])
+def get_jobs():
+    jobs = Job.query.all()
+    job_schema = JobSchema(many=True)
+    job_list = job_schema.dump(jobs)
+    return jsonify({'jobs': job_list})
+
+@job_api.route('/jobs/<int:job_id>', methods=['GET'])
+def get_job(job_id):
+    job = Job.query.get(job_id)
+    if job:
+        job_schema = JobSchema()
+        return jsonify(job_schema.dump(job))
+    else:
+        return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+
+@job_api.route('/jobs', methods=['POST'])
+def create_job():
+    try:
+        # Assuming JSON data is sent
+        data = request.json
+
+        # Validate input data using Marshmallow schema
+        job_schema = JobSchema()
+        errors = job_schema.validate(data)
+        
+        if errors:
+            return {'message': 'Validation error', 'errors': errors}, HTTPStatus.BAD_REQUEST
+
+        # Handle salary conversion more gracefully
+        try:
+            salary = float(data.get('salary', 0))
+        except ValueError:
+            return {'message': 'Invalid salary format'}, HTTPStatus.BAD_REQUEST
+
+        new_job = Job(
+            title=data['title'],
+            description=data['description'],
+            requirements=data.get('requirements'),
+            salary=salary,
+            location=data.get('location'),
+            company_id=int(data['company_id'])
+        )
+
+        db.session.add(new_job)
+        db.session.commit()
+
+        # Serialize the response using the Marshmallow schema
+        result = job_schema.dump(new_job)
+        return jsonify(result), HTTPStatus.CREATED
+
+    except Exception as e:
+        db.session.rollback()
+        return {'message': f'Internal Server Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+@job_api.route('/jobs/<int:job_id>', methods=['PUT'])
+def update_job(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+
+    try:
+        data = request.form
+
+        # Validate input data using Marshmallow schema
+        job_schema = JobSchema()
+        errors = job_schema.validate(data)
+        if errors:
+            return {'message': 'Validation errors', 'errors': errors}, HTTPStatus.BAD_REQUEST
+
+        job.title = data.get('title', job.title)
+        job.description = data.get('description', job.description)
+        job.requirements = data.get('requirements', job.requirements)
+        job.salary = float(data.get('salary', job.salary))
+        job.location = data.get('location', job.location)
+        job.company_id = int(data.get('company_id', job.company_id))
+
+        db.session.commit()
+
+        # Serialize the response using the Marshmallow schema
+        result = job_schema.dump(job)
+        return jsonify(result)
+
+    except Exception as e:
+        db.session.rollback()
+        return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+@job_api.route('/jobs/<int:job_id>', methods=['DELETE'])
+def delete_job(job_id):
+    job = Job.query.get(job_id)
+    if not job:
+        return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+
+    db.session.delete(job)
+    db.session.commit()
+
+    return {'message': 'Job deleted successfully'}
+
+
+@job_api.route('/jobs/company/<int:company_id>', methods=['GET'])
+def get_jobs_by_company(company_id):
+    jobs = Job.query.filter_by(company_id=company_id).all()
+
+    if not jobs:
+        return {'message': 'No jobs found for the given company_id'}, HTTPStatus.NOT_FOUND
+
+    job_schema = JobSchema(many=True)
+    job_list = job_schema.dump(jobs)
+    return jsonify({'jobs': job_list})
