@@ -63,16 +63,20 @@ def register():
 @account_api.route('/login', methods=['POST'])
 def login():
     try:
-        data = request.form
+        data = request.json
 
         email = data.get('email')
         password = data.get('password')
+
+        # Kiểm tra xem email và mật khẩu có được cung cấp hay không
+        if not email or not password:
+            return {'message': 'Email and password are required'}, HTTPStatus.BAD_REQUEST
 
         # Kiểm tra xem tài khoản có tồn tại không và mật khẩu có đúng không
         account = Account.query.filter_by(email=email).first()
         if account and account.check_password(password):
             access_token = create_access_token(identity=account.email)
-            return jsonify({'access_token': access_token, 'account': Account().dump(account)}), HTTPStatus.OK
+            return jsonify({'access_token': access_token}), HTTPStatus.OK
         else:
             return {'message': 'Invalid credentials'}, HTTPStatus.UNAUTHORIZED
 
