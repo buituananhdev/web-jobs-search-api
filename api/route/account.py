@@ -63,16 +63,31 @@ def register():
 @account_api.route('/login', methods=['POST'])
 def login():
     try:
-        data = request.form
+        data = request.json
 
         email = data.get('email')
         password = data.get('password')
 
+        # Kiểm tra xem email và mật khẩu có được cung cấp hay không
+        if not email or not password:
+            return {'message': 'Email and password are required'}, HTTPStatus.BAD_REQUEST
+
         # Kiểm tra xem tài khoản có tồn tại không và mật khẩu có đúng không
         account = Account.query.filter_by(email=email).first()
         if account and account.check_password(password):
-            access_token = create_access_token(identity=account.email)
-            return jsonify({'access_token': access_token, 'account': Account().dump(account)}), HTTPStatus.OK
+            # Create JWT token with additional claims
+            expires = 3600  # Set your desired expiration time in seconds
+            access_token = create_access_token(identity=account.email, expires_delta=expires)
+
+            # Additional information to include in the response
+            response_data = {
+                'access_token': access_token,
+                'created_at': account.created_at.strftime('%Y-%m-%d %H:%M:%S'),  # Format the datetime
+                'expires': expires,
+                'email': account.email
+            }
+
+            return jsonify(response_data), HTTPStatus.OK
         else:
             return {'message': 'Invalid credentials'}, HTTPStatus.UNAUTHORIZED
 
@@ -83,9 +98,23 @@ def login():
 @jwt_required()
 def protected():
     try:
-        # Access the identity of the current user with get_jwt_identity
         current_user = get_jwt_identity()
         return jsonify(logged_in_as=current_user), HTTPStatus.OK
 
+    except Exception as e:
+        return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@account_api.route('/getMe', methods=['GET'])
+@jwt_required()
+def get_my_info():
+    try:
+        current_user_email = get_jwt_identity()
+        account = Account.query.filter_by(email=current_user_email).first()
+        if not account:
+            return {'message': 'User not found'}, HTTPStatus.NOT_FOUND
+        account_schema = AccountSchema()
+        result = account_schema.dump(account)
+        return jsonify(result), HTTPStatus.OK
     except Exception as e:
         return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR

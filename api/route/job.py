@@ -1,52 +1,63 @@
 from flask import Blueprint, request, jsonify
 from http import HTTPStatus
+from sqlalchemy import or_
 from api.models.database import db
 from api.models.job import Job
-from api.schemas.job_schema import JobSchema  # Adjust the import based on your project structure
+from api.schemas.job_schema import JobSchema
 
 job_api = Blueprint('job_api', __name__)
 
 @job_api.route('/jobs', methods=['GET'])
 def get_filtered_jobs():
-    company_id = int(request.args.get('companyId', 0))
-    keyword = request.args.get('keyword', '').strip()
-    location = request.args.get('location', 'all' if request.args.get('location') is None else '').strip()
-    salary = request.args.get('salary', '0').strip()
+    try:
+        company_id = int(request.args.get('companyId', 0))
+        keyword = request.args.get('keyword', '').strip()
+        location = request.args.get('location', 'all' if request.args.get('location') is None else '').strip()
+        salary = request.args.get('salary', '0').strip()
 
-    filtered_query = Job.query
+        filtered_query = Job.query
 
-    if keyword or location != 'all' or salary != '0' or company_id > 0:
-        filtered_query = filtered_query.filter(
-            or_(Job.title.ilike(f"%{keyword}%") if keyword else "",
-                Job.location == location if location != 'all' else "",
-                Job.company_id == company_id if company_id > 0 else "",
-                and_(Job.salary >= 10000000, Job.salary <= 25000000) if salary else ""
+        if keyword or location != 'all' or salary != '0' or company_id > 0:
+            filtered_query = filtered_query.filter(
+                or_(Job.title.ilike(f"%{keyword}%") if keyword else "",
+                    Job.location == location if location != 'all' else "",
+                    Job.company_id == company_id if company_id > 0 else "",
+                    and_(Job.salary >= 10000000, Job.salary <= 25000000) if salary else ""
+                )
             )
-        )
 
-    jobs = filtered_query.all()
+        jobs = filtered_query.all()
 
-    return jsonify({'jobs': jobs})
+        job_schema = JobSchema(many=True)
+        filtered_job_list = job_schema.dump(jobs)
+
+        return jsonify({'jobs': filtered_job_list})
+
+    except Exception as e:
+        return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
 @job_api.route('/jobs/<int:job_id>', methods=['GET'])
 def get_job(job_id):
-    job = Job.query.get(job_id)
-    if job:
-        job_schema = JobSchema()
-        return jsonify(job_schema.dump(job))
-    else:
-        return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+    try:
+        job = Job.query.get(job_id)
+        if job:
+            job_schema = JobSchema()
+            return jsonify(job_schema.dump(job))
+        else:
+            return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+
+    except Exception as e:
+        return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
 @job_api.route('/jobs', methods=['POST'])
 def create_job():
     try:
-        # Assuming JSON data is sent
         data = request.json
 
         # Validate input data using Marshmallow schema
         job_schema = JobSchema()
         errors = job_schema.validate(data)
-        
+
         if errors:
             return {'message': 'Validation error', 'errors': errors}, HTTPStatus.BAD_REQUEST
 
@@ -78,12 +89,12 @@ def create_job():
 
 @job_api.route('/jobs/<int:job_id>', methods=['PUT'])
 def update_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
-
     try:
-        data = request.form
+        job = Job.query.get(job_id)
+        if not job:
+            return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+
+        data = request.json
 
         # Validate input data using Marshmallow schema
         job_schema = JobSchema()
@@ -110,23 +121,31 @@ def update_job(job_id):
 
 @job_api.route('/jobs/<int:job_id>', methods=['DELETE'])
 def delete_job(job_id):
-    job = Job.query.get(job_id)
-    if not job:
-        return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+    try:
+        job = Job.query.get(job_id)
+        if not job:
+            return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
 
-    db.session.delete(job)
-    db.session.commit()
+        db.session.delete(job)
+        db.session.commit()
 
-    return {'message': 'Job deleted successfully'}
+        return {'message': 'Job deleted successfully'}
 
+    except Exception as e:
+        db.session.rollback()
+        return {'message': f'Internal Server Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
 
 @job_api.route('/jobs/company/<int:company_id>', methods=['GET'])
 def get_jobs_by_company(company_id):
-    jobs = Job.query.filter_by(company_id=company_id).all()
+    try:
+        jobs = Job.query.filter_by(company_id=company_id).all()
 
-    if not jobs:
-        return {'message': 'No jobs found for the given company_id'}, HTTPStatus.NOT_FOUND
+        if not jobs:
+            return {'message': 'No jobs found for the given company_id'}, HTTPStatus.NOT_FOUND
 
-    job_schema = JobSchema(many=True)
-    job_list = job_schema.dump(jobs)
-    return jsonify({'jobs': job_list})
+        job_schema = JobSchema(many=True)
+        job_list = job_schema.dump(jobs)
+        return jsonify({'jobs': job_list})
+
+    except Exception as e:
+        return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
