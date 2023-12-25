@@ -6,3 +6,6 @@ class Account(db.Model):
     email = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
     role = db.Column(db.String(20), nullable=False)
+
+    def check_password(self, password):
+        return self.password == password

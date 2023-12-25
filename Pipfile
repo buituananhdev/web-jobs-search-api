@@ -12,7 +12,10 @@ python-dotenv = "*"
 flask_sqlalchemy = "*"
 flask-jwt-extended = "*"
 flask_jwt_extended = "*"
+flask_cors = "*"
+gunicorn = "*"
+
 [dev-packages]
 
 [requires]
-python_version = "3.10"
+python_version = "3.8.10"
