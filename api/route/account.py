@@ -76,7 +76,7 @@ def login():
         account = Account.query.filter_by(email=email).first()
         if account and account.check_password(password):
             access_token = create_access_token(identity=account.email)
-            return jsonify({'access_token': access_token}), HTTPStatus.OK
+            return jsonify({'access_token': access_token, 'account': Account().dump(account)}), HTTPStatus.OK
         else:
             return {'message': 'Invalid credentials'}, HTTPStatus.UNAUTHORIZED
 
@@ -87,9 +87,23 @@ def login():
 @jwt_required()
 def protected():
     try:
-        # Access the identity of the current user with get_jwt_identity
         current_user = get_jwt_identity()
         return jsonify(logged_in_as=current_user), HTTPStatus.OK
 
+    except Exception as e:
+        return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@account_api.route('/getMe', methods=['GET'])
+@jwt_required()
+def get_my_info():
+    try:
+        current_user_email = get_jwt_identity()
+        account = Account.query.filter_by(email=current_user_email).first()
+        if not account:
+            return {'message': 'User not found'}, HTTPStatus.NOT_FOUND
+        account_schema = AccountSchema()
+        result = account_schema.dump(account)
+        return jsonify(result), HTTPStatus.OK
     except Exception as e:
         return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
