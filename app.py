@@ -6,6 +6,8 @@ from flask import Flask
 from api.route.account import account_api
 from api.route.job import job_api
 from api.route.company import company_api
+from api.route.applicant import applicant_api
+
 
 from api.models.database import db
 
@@ -27,6 +29,8 @@ def create_app():
     app.register_blueprint(account_api, url_prefix='/api')
     app.register_blueprint(job_api, url_prefix='/api')
     app.register_blueprint(company_api, url_prefix='/api')
+    app.register_blueprint(applicant_api, url_prefix='/api')
+
 
     return app
 

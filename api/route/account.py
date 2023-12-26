@@ -68,20 +68,35 @@ def login():
         email = data.get('email')
         password = data.get('password')
 
-        # Kiểm tra xem email và mật khẩu có được cung cấp hay không
+        # Check if email and password are provided
         if not email or not password:
             return {'message': 'Email and password are required'}, HTTPStatus.BAD_REQUEST
 
-        # Kiểm tra xem tài khoản có tồn tại không và mật khẩu có đúng không
+        # Check if the account exists and the password is correct
         account = Account.query.filter_by(email=email).first()
         if account and account.check_password(password):
             access_token = create_access_token(identity=account.email)
-            return jsonify({'access_token': access_token, 'account': Account().dump(account)}), HTTPStatus.OK
+            entity_id = 0
+
+            if account.role == 'candidate':
+                candidate = Candidate.query.filter_by(account_id=account.account_id).first()
+                entity_id = candidate.candidate_id if candidate else 0
+            elif account.role == 'company':
+                company = Company.query.filter_by(account_id=account.account_id).first()
+                entity_id = company.company_id if company else 0
+
+            # Create an instance of AccountSchema and use it to serialize the account
+            account_schema = AccountSchema()
+            serialized_account = account_schema.dump(account)
+
+            return jsonify({'entity_id': entity_id, 'access_token': access_token, 'account': serialized_account}), HTTPStatus.OK
         else:
             return {'message': 'Invalid credentials'}, HTTPStatus.UNAUTHORIZED
 
     except Exception as e:
         return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
 
 @account_api.route('/protected', methods=['GET'])
 @jwt_required()
@@ -100,10 +115,26 @@ def get_my_info():
     try:
         current_user_email = get_jwt_identity()
         account = Account.query.filter_by(email=current_user_email).first()
+
         if not account:
             return {'message': 'User not found'}, HTTPStatus.NOT_FOUND
+
         account_schema = AccountSchema()
         result = account_schema.dump(account)
+
+        # Get entity_id based on the user's role
+        entity_id = 0
+        if account.role == 'candidate':
+            candidate = Candidate.query.filter_by(account_id=account.account_id).first()
+            entity_id = candidate.candidate_id if candidate else 0
+        elif account.role == 'company':
+            company = Company.query.filter_by(account_id=account.account_id).first()
+            entity_id = company.company_id if company else 0
+
+        # Include entity_id in the response
+        result['entity_id'] = entity_id
+
         return jsonify(result), HTTPStatus.OK
+
     except Exception as e:
         return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR
