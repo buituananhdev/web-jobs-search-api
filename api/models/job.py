@@ -12,3 +12,4 @@ class Job(db.Model):
     
     # Thêm quan hệ với Company
     company = db.relationship('Company', back_populates='jobs')
+    

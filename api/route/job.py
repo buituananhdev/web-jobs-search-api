@@ -1,9 +1,13 @@
 from flask import Blueprint, request, jsonify
 from http import HTTPStatus
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from api.models.database import db
 from api.models.job import Job
+from api.models.candidate import Candidate
+from api.models.applicant import Applicant
 from api.schemas.job_schema import JobSchema
+from api.schemas.candidate_schema import CandidateSchema
 
 job_api = Blueprint('job_api', __name__)
 
@@ -136,3 +140,30 @@ def get_jobs_by_company(company_id):
     job_schema = JobSchema(many=True)
     job_list = job_schema.dump(jobs)
     return jsonify({'jobs': job_list})
+
+
+@job_api.route('/jobs/<int:job_id>/candidates', methods=['GET'])
+def get_candidates_for_job(job_id):
+    try:
+        job = Job.query.get(job_id)
+
+        if not job:
+            return {'message': 'Job not found'}, HTTPStatus.NOT_FOUND
+
+        # Retrieve candidates associated with the given job_id
+        candidates = (
+            Candidate.query
+            .join(Applicant, Candidate.candidate_id == Applicant.candidate_id)
+            .filter(Applicant.job_id == job_id)
+            .options(joinedload(Candidate.account))  # Assuming you want to load associated Account as well
+            .all()
+        )
+
+        # Serialize the response using the CandidateSchema
+        candidate_schema = CandidateSchema(many=True)
+        candidate_list = candidate_schema.dump(candidates)
+
+        return jsonify({'candidates': candidate_list})
+
+    except Exception as e:
+        return {'message': f'Error: {str(e)}'}, HTTPStatus.INTERNAL_SERVER_ERROR

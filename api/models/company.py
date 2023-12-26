@@ -10,3 +10,4 @@ class Company(db.Model):
     account = db.relationship('Account', backref=db.backref('companies', lazy=True))
     # Thêm quan hệ với Job
     jobs = db.relationship('Job', back_populates='company')
+    
