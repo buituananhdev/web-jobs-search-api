@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from http import HTTPStatus
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 from sqlalchemy.orm import joinedload
 from api.models.database import db
 from api.models.job import Job
@@ -15,20 +15,40 @@ job_api = Blueprint('job_api', __name__)
 def get_filtered_jobs():
     try:
         company_id = int(request.args.get('companyId', 0))
-        keyword = request.args.get('keyword', '').strip()
+        keyword = request.args.get('key_word', '').strip()
         location = request.args.get('location', 'all' if request.args.get('location') is None else '').strip()
         salary = request.args.get('salary', '0').strip()
 
         filtered_query = Job.query
 
-        if keyword or location != 'all' or salary != '0' or company_id > 0:
-            filtered_query = filtered_query.filter(
-                or_(Job.title.ilike(f"%{keyword}%") if keyword else "",
-                    Job.location == location if location != 'all' else "",
-                    Job.company_id == company_id if company_id > 0 else "",
-                    and_(Job.salary >= 10000000, Job.salary <= 25000000) if salary else ""
-                )
-            )
+        conditions = []
+
+        if keyword != '':
+            conditions.append(Job.title.ilike(f"%{keyword}%"))
+
+        if location != 'all':
+            conditions.append(Job.location == location)
+
+        if company_id > 0:
+            conditions.append(Job.company_id == company_id)
+
+        if salary == '1':
+            conditions.append(and_(Job.salary <= 10000000))
+        
+        if salary == '2':
+            conditions.append(and_(Job.salary >= 10000000, Job.salary <= 15000000))
+
+        if salary == '3':
+            conditions.append(and_(Job.salary >= 15000000, Job.salary <= 20000000))
+        
+        if salary == '4':
+            conditions.append(and_(Job.salary >= 20000000, Job.salary <= 25000000))
+
+        if salary == '5':
+            conditions.append(and_(Job.salary >= 25000000))
+
+        if conditions:
+            filtered_query = filtered_query.filter(and_(*conditions))
 
         jobs = filtered_query.all()
 
